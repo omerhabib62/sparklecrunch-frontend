@@ -1,22 +1,45 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { User } from '../@types/user';
 
-type AuthStore = {
+interface AuthState {
   user: User | null;
-  token: string | null;
-  login: (user: User, token: string) => void;
+  accessToken: string | null;
+  isAuthenticated: boolean;
+  isHydrated: boolean;
+  login: (user: User, accessToken: string) => void;
   logout: () => void;
-};
+}
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  token: null,
-  login: (user, token) => {
-    localStorage.setItem('token', token);
-    set({ user, token });
-  },
-  logout: () => {
-    localStorage.removeItem('token');
-    set({ user: null, token: null });
-  },
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
+      isHydrated: false,
+      login: (user: User, accessToken: string) => 
+        set({ 
+          user, 
+          accessToken, 
+          isAuthenticated: true 
+        }),
+      logout: () => 
+        set({ 
+          user: null, 
+          accessToken: null, 
+          isAuthenticated: false 
+        }),
+    }),
+    {
+      name: 'auth-storage',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.isHydrated = true;
+          // Re-check authentication after hydration
+          state.isAuthenticated = !!(state.user && state.accessToken);
+        }
+      },
+    }
+  )
+);

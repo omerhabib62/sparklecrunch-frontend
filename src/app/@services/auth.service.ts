@@ -1,25 +1,28 @@
-import api from '@/lib/api';
+import api from '../@lib/api';
 import { User } from '../@types/user';
 import { LoginResponse } from '../@responses/login.response';
+import { API_CONFIG } from '../@config/api.config';
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
-  // Replace this with your actual API call
-  const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Login failed');
-  }
-
-  return response.json();
+  console.log('Auth service - login called with:', { email, password: password ? '***' : 'EMPTY' });
+  
+  const payload = {
+    email,
+    password,
+  };
+  
+  console.log('Sending payload:', { ...payload, password: payload.password ? '***' : 'EMPTY' });
+  
+  const response = await api.post(API_CONFIG.ENDPOINTS.AUTH.LOGIN, payload);
+  
+  return response.data;
 }
 
 export async function register(data: any): Promise<{ user: User; accessToken: string }> {
-  const res = await api.post('/auth/register', data);
-  return res.data;
+  const response = await api.post(API_CONFIG.ENDPOINTS.AUTH.REGISTER, data);
+  return response.data;
+}
+
+export async function logout(): Promise<void> {
+  await api.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT);
 }
