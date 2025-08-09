@@ -24,5 +24,14 @@ export async function register(data: any): Promise<{ user: User; accessToken: st
 }
 
 export async function logout(): Promise<void> {
-  await api.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT);
+  // Get session ID from localStorage or generate one
+  // You'll need to store sessionId when user logs in
+  const authStorage = JSON.parse(localStorage.getItem('auth-storage') || '{}');
+  const sessionId = authStorage.state?.sessionId || 'current-session';
+  
+  const payload = {
+    sessionId
+  };
+  
+  await api.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT, payload);
 }
