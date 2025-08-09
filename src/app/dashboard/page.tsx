@@ -4,27 +4,22 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Give time for persisted store to hydrate
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
+    // Only check authentication after store has hydrated
+    if (isHydrated && !isAuthenticated) {
       router.push("/login");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isHydrated, router]);
+
+  if (!isHydrated) {
+    return <div>Loading...</div>;
+  }
 
   if (!isAuthenticated) {
-    return <div>Loading...</div>;
+    return <div>Redirecting...</div>;
   }
 
   return (
