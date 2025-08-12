@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { login } from "../@services/auth.service";
 import { useAuthStore } from "../@stores/auth.store";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,8 +32,23 @@ export default function LoginPage() {
         password: password ? "***" : "EMPTY",
       });
       const { user, accessToken } = await login(email, password);
-      setAuth(user, accessToken);
-      router.push("/dashboard");
+
+      // If backend doesn't provide profileCompleted, assume it's false for new users
+      const userWithProfile = {
+        ...user,
+        profileCompleted: user.profileCompleted ?? false,
+      };
+      setAuth(userWithProfile, accessToken);
+      // if (user.role === "admin") {
+      //   router.push("/dashboard");
+      // }
+      // if (!user.profileCompleted) {
+      //   router.push("/onboarding");
+      // } else {
+      //   router.push("/dashboard");
+      // }
+      // Let middleware handle the redirect - just refresh to trigger it
+      window.location.href = "/dashboard";
     } catch (err) {
       console.error("Login error:", err);
       setError("Login failed! Please check your credentials.");
@@ -52,32 +68,69 @@ export default function LoginPage() {
       )}
 
       <form onSubmit={handleLogin}>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          className="border p-2 w-full mb-2"
-          required
-          disabled={isLoading}
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="border p-2 w-full mb-2"
-          required
-          disabled={isLoading}
-        />
+        <div className="mb-4">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="mb-4">
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Password <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            required
+            disabled={isLoading}
+          />
+        </div>
+
         <button
           type="submit"
-          className="bg-black text-white px-4 py-2 w-full disabled:opacity-50"
+          className="bg-black text-white px-4 py-2 w-full disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-800 transition-colors"
           disabled={isLoading}
         >
           {isLoading ? "Logging in..." : "Login"}
         </button>
       </form>
+
+      <div className="mt-6 text-center space-y-2">
+        <p className="text-gray-600">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="text-blue-600 hover:text-blue-800 font-medium"
+          >
+            Sign up here
+          </Link>
+        </p>
+        <p>
+          <Link href="/" className="text-gray-500 hover:text-gray-700">
+            ← Back to Home
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

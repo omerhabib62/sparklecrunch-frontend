@@ -6,4 +6,5 @@ export interface User {
   role: UserRole;
   firstName: string;
   lastName: string;
+  profileCompleted?: boolean;
 }
