@@ -31,24 +31,16 @@ export default function LoginPage() {
         email,
         password: password ? "***" : "EMPTY",
       });
-      const { user, accessToken } = await login(email, password);
+      const response = await login(email, password);
+      console.log("🔥 RAW API RESPONSE:", response);
 
-      // If backend doesn't provide profileCompleted, assume it's false for new users
-      const userWithProfile = {
-        ...user,
-        profileCompleted: user.profileCompleted ?? false,
-      };
-      setAuth(userWithProfile, accessToken);
-      // if (user.role === "admin") {
-      //   router.push("/dashboard");
-      // }
-      // if (!user.profileCompleted) {
-      //   router.push("/onboarding");
-      // } else {
-      //   router.push("/dashboard");
-      // }
-      // Let middleware handle the redirect - just refresh to trigger it
-      window.location.href = "/dashboard";
+      const { user, accessToken } = response;
+      console.log("🔥 USER FROM API:", user);
+      console.log("🔥 profileCompleted from API:", user.profileCompleted);
+
+      setAuth(user, accessToken);
+
+      window.location.href = "/";
     } catch (err) {
       console.error("Login error:", err);
       setError("Login failed! Please check your credentials.");

@@ -1,19 +1,10 @@
 "use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { API_CONFIG } from "./@config/api.config";
 import { useAuthStore } from "./@stores/auth.store";
 import Link from "next/link";
 
 export default function HomePage() {
   const { isAuthenticated, isHydrated } = useAuthStore();
-  const router = useRouter();
-
-  useEffect(() => {
-    // Redirect authenticated users to dashboard
-    if (isHydrated && isAuthenticated) {
-      router.push("/dashboard");
-    }
-  }, [isAuthenticated, isHydrated, router]);
 
   // Show loading until hydrated
   if (!isHydrated) {
@@ -24,42 +15,38 @@ export default function HomePage() {
     );
   }
 
-  // If authenticated, show redirecting message
-  if (isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        Redirecting to dashboard...
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center max-w-4xl mx-auto">
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Welcome to {process.env.NEXT_PUBLIC_APP_NAME || "SparkleCrunch"}
+            Welcome to {API_CONFIG.APP_NAME}
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            {process.env.NEXT_PUBLIC_APP_TAGLINE ||
-              "Your platform for connecting clients and freelancers"}
-          </p>
+          <p className="text-xl text-gray-600 mb-8">{API_CONFIG.TAGLINE}</p>
 
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/login"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-            >
-              Login
-            </Link>
-            <Link
-              href="/register"
-              className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-            >
-              Sign Up
-            </Link>
-          </div>
+          {/* Only show login/register buttons if NOT authenticated */}
+          {!isAuthenticated && (
+            <div className="flex gap-4 justify-center">
+              <Link
+                href="/login"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                href="/register"
+                className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
         </div>
+
+        {/* Remove this section completely - let middleware handle redirects silently */}
+        {/* {isAuthenticated && (
+          <p className="text-gray-600">You are logged in. Redirecting...</p>
+        )} */}
 
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           <div className="text-center p-6 bg-white rounded-lg shadow-sm">

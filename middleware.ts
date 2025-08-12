@@ -1,68 +1,12 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-
-// Cache for backend status to avoid multiple requests
-let backendStatusCache: { isOnline: boolean; lastChecked: number } | null = null;
-const CACHE_DURATION = 30000; // 30 seconds
-
-async function checkBackendHealth(): Promise<boolean> {
-    if (backendStatusCache && (Date.now() - backendStatusCache.lastChecked) < CACHE_DURATION) {
-        console.log('🏥 Using cached backend status:', backendStatusCache.isOnline);
-        return backendStatusCache.isOnline;
-    }
-
-    try {
-        console.log('🏥 Checking backend health at:', `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1/api'}/health`);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/v1/api'}/health`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            signal: AbortSignal.timeout(5000)
-        });
-
-        const isOnline = response.ok;
-        console.log('🏥 Backend health result:', isOnline ? 'Online' : 'Offline', response.status);
-
-        backendStatusCache = { isOnline, lastChecked: Date.now() };
-        return isOnline;
-    } catch (error) {
-        console.error('🚨 Backend health check failed:', error.message);
-        backendStatusCache = { isOnline: false, lastChecked: Date.now() };
-        return false;
-    }
-}
+import { NextRequest, NextResponse } from "next/server";
 
 export async function middleware(request: NextRequest) {
-    console.log('🔥 MIDDLEWARE HIT:', request.nextUrl.pathname);
+    console.log('🚨 MIDDLEWARE RUNNING:', request.nextUrl.pathname);
 
     const { pathname } = request.nextUrl;
 
-    // Check backend health first
-    const isBackendOnline = await checkBackendHealth();
-
-    if (!isBackendOnline) {
-        console.log('🚨 Backend is offline, showing maintenance page');
-
-        // Don't redirect maintenance page to itself
-        if (pathname !== '/maintenance') {
-            return NextResponse.redirect(new URL('/maintenance', request.url));
-        }
-
-        // Allow access to maintenance page
-        return NextResponse.next();
-    }
-
-    // If backend is online but user is on maintenance page, redirect them away
-    if (pathname === '/maintenance') {
-        console.log('✅ Backend is back online, redirecting from maintenance');
-        return NextResponse.redirect(new URL('/', request.url));
-    }
-
     // Get auth data from cookies
     const authCookie = request.cookies.get('auth-storage');
-    console.log('🍪 Auth cookie:', authCookie?.value ? 'Found' : 'Not found');
-
     let authData = null;
 
     if (authCookie) {
@@ -74,36 +18,37 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    const isAuthenticated = authData?.isAuthenticated;
+    const isAuthenticated = authData?.isAuthenticated === true;
     const user = authData?.user;
     const isAdmin = user?.role === 'admin';
     const profileCompleted = user?.profileCompleted === true;
 
-    console.log('🛡️ Middleware check:', {
+    console.log('🛡️ Auth status:', {
         pathname,
         isAuthenticated,
         userRole: user?.role,
         profileCompleted,
-        isAdmin,
-        backendOnline: isBackendOnline
+        isAdmin
     });
 
-    // Public routes that don't require authentication
-    const publicRoutes = ['/', '/login', '/register'];
+    // Define route types
+    const publicRoutes = ['/login', '/register', '/maintenance'];
     const isPublicRoute = publicRoutes.includes(pathname);
-
-    // Auth-required routes
     const protectedRoutes = ['/dashboard', '/onboarding'];
     const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
 
-    // If not authenticated and trying to access protected route
-    if (!isAuthenticated && isProtectedRoute) {
-        console.log('🚪 Redirecting to login: not authenticated');
-        return NextResponse.redirect(new URL('/login', request.url));
+    // 1. Handle unauthenticated users first
+    if (!isAuthenticated) {
+        if (isProtectedRoute) {
+            console.log('🚪 Redirecting to login: not authenticated');
+            return NextResponse.redirect(new URL('/login', request.url));
+        }
+        // Allow access to public routes and home page
+        return NextResponse.next();
     }
 
-    // If authenticated and trying to access public auth routes
-    if (isAuthenticated && (pathname === '/login' || pathname === '/register')) {
+    // 2. Handle authenticated users trying to access auth pages
+    if (pathname === '/login' || pathname === '/register') {
         if (isAdmin) {
             console.log('👑 Redirecting admin to dashboard');
             return NextResponse.redirect(new URL('/dashboard', request.url));
@@ -118,24 +63,52 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
     }
 
-    // If authenticated but profile not completed and not on onboarding
-    if (isAuthenticated && !isAdmin && !profileCompleted && pathname !== '/onboarding') {
-        console.log('📝 Redirecting to onboarding: profile incomplete');
-        return NextResponse.redirect(new URL('/onboarding', request.url));
-    }
+    // 3. Handle home page for authenticated users
+    if (pathname === '/') {
+        if (isAdmin) {
+            console.log('👑 Redirecting admin from home to dashboard');
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
 
-    // If authenticated, profile completed, and on onboarding (trying to bypass)
-    if (isAuthenticated && profileCompleted && pathname === '/onboarding') {
-        console.log('✅ Redirecting to dashboard: profile already completed');
+        if (!profileCompleted) {
+            console.log('📝 Redirecting from home to onboarding: profile not completed');
+            return NextResponse.redirect(new URL('/onboarding', request.url));
+        }
+
+        console.log('✅ Redirecting from home to dashboard: profile completed');
         return NextResponse.redirect(new URL('/dashboard', request.url));
     }
 
-    // If admin trying to access onboarding
-    if (isAuthenticated && isAdmin && pathname === '/onboarding') {
-        console.log('👑 Redirecting admin away from onboarding');
-        return NextResponse.redirect(new URL('/dashboard', request.url));
+    // 4. Handle onboarding page access
+    if (pathname === '/onboarding') {
+        if (isAdmin) {
+            console.log('👑 Redirecting admin away from onboarding');
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
+
+        if (profileCompleted) {
+            console.log('✅ Redirecting to dashboard: profile already completed');
+            return NextResponse.redirect(new URL('/dashboard', request.url));
+        }
+
+        // Allow access if authenticated and profile not completed
+        console.log('✅ Allowing access to onboarding');
+        return NextResponse.next();
     }
 
+    // 5. Handle dashboard and other protected routes
+    if (pathname.startsWith('/dashboard')) {
+        if (!profileCompleted && !isAdmin) {
+            console.log('📝 Redirecting to onboarding: profile incomplete');
+            return NextResponse.redirect(new URL('/onboarding', request.url));
+        }
+
+        // Allow access if authenticated and (profile completed OR admin)
+        console.log('✅ Allowing access to dashboard');
+        return NextResponse.next();
+    }
+
+    // 6. Allow access to any other routes
     console.log('✅ Allowing access to:', pathname);
     return NextResponse.next();
 }

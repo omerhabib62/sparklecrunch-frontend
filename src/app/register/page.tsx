@@ -98,7 +98,9 @@ export default function RegisterPage() {
     try {
       const { user, accessToken } = await register(form);
       setAuth(user, accessToken);
-      router.push("/dashboard");
+
+      // Just navigate - let middleware decide where to go
+      window.location.href = "/";
     } catch (err) {
       console.error("Registration error:", err);
       setError("Registration failed. Please try again.");

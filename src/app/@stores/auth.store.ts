@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '../@types/user';
+import { setCookie } from '../@utils/set-cookie';
+import { deleteCookie } from '../@utils/delete-cookie';
 
 interface AuthState {
   user: User | null;
@@ -10,23 +12,8 @@ interface AuthState {
   isHydrated: boolean;
   login: (user: User, accessToken: string, sessionId?: string) => void;
   logout: () => void;
+  updateUser: (patch: Partial<User>) => void;
 }
-
-// Helper function to set cookie
-const setCookie = (name: string, value: string, days: number = 7) => {
-  if (typeof document !== 'undefined') {
-    const expires = new Date();
-    expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-    document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/`;
-  }
-};
-
-// Helper function to delete cookie
-const deleteCookie = (name: string) => {
-  if (typeof document !== 'undefined') {
-    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-  }
-};
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -60,13 +47,29 @@ export const useAuthStore = create<AuthState>()(
         // Clear cookie
         deleteCookie('auth-storage');
       },
+      updateUser: (patch: Partial<User>) => {
+        const { user, accessToken, sessionId } = get();
+        const newUser = user ? { ...user, ...patch } : null;
+        const newState = {
+          user: newUser,
+          accessToken,
+          sessionId,
+          isAuthenticated: !!(newUser && accessToken && sessionId),
+        };
+        set(newState);
+        setCookie('auth-storage', JSON.stringify({ state: newState }));
+      },
     }),
     {
       name: 'auth-storage',
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.isHydrated = true;
-          state.isAuthenticated = !!(state.user && state.accessToken && state.sessionId);
+          state.isAuthenticated = !!(
+            state.user &&
+            state.accessToken &&
+            state.sessionId
+          );
 
           // Sync with cookies after rehydration
           if (state.isAuthenticated) {

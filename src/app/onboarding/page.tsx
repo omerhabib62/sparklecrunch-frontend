@@ -3,28 +3,106 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "../@stores/auth.store";
 import { logout as logoutService } from "../@services/auth.service";
+import {
+  completeClientOnboarding,
+  completeFreelancerOnboarding,
+} from "../@services/onboarding.service";
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user, logout, updateUser, isHydrated } = useAuthStore();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  if (!isHydrated) {
+    return <div className="p-4 max-w-md mx-auto mt-10">Loading...</div>;
+  }
+
+  if (!user) {
+    // Middleware should handle this, but guard anyway
+    router.push("/login");
+    return null;
+  }
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      // Call API logout endpoint
       await logoutService();
-      // Clear local auth state
-      logout();
-      // Redirect to login
-      router.push("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-      // Clear local state even if API call fails
-      logout();
-      router.push("/login");
+    } catch (e) {
+      // ignore backend failure on logout
     } finally {
-      setIsLoggingOut(false);
+      logout();
+      router.push("/login");
+    }
+  };
+
+  const handleFreelancerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError("");
+
+    const form = new FormData(e.target as HTMLFormElement);
+    const bio = String(form.get("bio") || "").trim();
+    const phone = String(form.get("phone") || "").trim();
+    const skillsRaw = String(form.get("skills") || "");
+    const skills = skillsRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (!bio || skills.length === 0) {
+      setError("Please fill in the required fields.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const updated = await completeFreelancerOnboarding({
+        bio,
+        phone,
+        skills,
+      });
+      updateUser({ ...updated, profileCompleted: true });
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Freelancer onboarding error:", err);
+      setError("Failed to complete onboarding. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleClientSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError("");
+
+    const form = new FormData(e.target as HTMLFormElement);
+    const phone = String(form.get("phone") || "").trim();
+    const companyName = String(form.get("companyName") || "").trim();
+    const bio = String(form.get("bio") || "").trim();
+
+    // Adjust required fields per your backend rules
+    if (!bio) {
+      setError("Please fill in the required fields.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const updated = await completeClientOnboarding({
+        phone,
+        companyName,
+        bio,
+      });
+      updateUser({ ...updated, profileCompleted: true });
+      router.push("/dashboard");
+    } catch (err) {
+      console.error("Client onboarding error:", err);
+      setError("Failed to complete onboarding. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -43,131 +121,139 @@ export default function OnboardingPage() {
 
       <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-6">
         <p className="text-sm">
-          Welcome {user?.firstName || user?.email}! Please complete your profile
-          to access all features.
+          Welcome {user.firstName || user.email}! Please complete your profile.
         </p>
       </div>
 
-      <form>
-        <div className="mb-4">
-          <label
-            htmlFor="bio"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Bio <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            id="bio"
-            rows={4}
-            placeholder="Tell us about yourself..."
-            className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          {error}
         </div>
+      )}
 
-        <div className="mb-4">
-          <label
-            htmlFor="phone"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Phone Number <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="phone"
-            type="tel"
-            placeholder="Enter your phone number"
-            className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label
-            htmlFor="location"
-            className="block text-sm font-medium text-gray-700 mb-1"
-          >
-            Location <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="location"
-            type="text"
-            placeholder="Enter your location"
-            className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            required
-          />
-        </div>
-
-        {user?.role === "freelancer" && (
-          <>
-            <div className="mb-4">
-              <label
-                htmlFor="skills"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Skills <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="skills"
-                type="text"
-                placeholder="e.g., JavaScript, React, Node.js"
-                className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Separate skills with commas
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <label
-                htmlFor="hourlyRate"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Hourly Rate (USD) <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="hourlyRate"
-                type="number"
-                min="1"
-                placeholder="25"
-                className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-          </>
-        )}
-
-        {user?.role === "client" && (
+      {user.role === "freelancer" ? (
+        <form onSubmit={handleFreelancerSubmit}>
           <div className="mb-4">
             <label
-              htmlFor="company"
+              htmlFor="bio"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Bio <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="bio"
+              name="bio"
+              rows={4}
+              placeholder="Tell us about yourself..."
+              className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label
+              htmlFor="skills"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Skills <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="skills"
+              name="skills"
+              type="text"
+              placeholder="e.g., JavaScript, React, Node.js"
+              className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+            <p className="text-sm text-gray-500 mt-1">
+              Separate skills with commas
+            </p>
+          </div>
+
+          <div className="mb-6">
+            <label
+              htmlFor="phone"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Phone Number
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              placeholder="Enter your phone number"
+              className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="bg-black text-white px-4 py-2 w-full disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-800 transition-colors"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Saving..." : "Complete Profile"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleClientSubmit}>
+          <div className="mb-4">
+            <label
+              htmlFor="bio"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Bio <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="bio"
+              name="bio"
+              rows={4}
+              placeholder="Describe your needs or company"
+              className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          <div className="mb-4">
+            <label
+              htmlFor="companyName"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
               Company Name
             </label>
             <input
-              id="company"
+              id="companyName"
+              name="companyName"
               type="text"
               placeholder="Enter your company name (optional)"
               className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-        )}
 
-        <button
-          type="submit"
-          className="bg-black text-white px-4 py-2 w-full disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-800 transition-colors"
-        >
-          Complete Profile
-        </button>
-      </form>
+          <div className="mb-6">
+            <label
+              htmlFor="phone"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Phone Number
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              placeholder="Enter your phone number"
+              className="border border-gray-300 rounded-md p-2 w-full focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
 
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-500">
-          Your information is secure and will only be used to improve your
-          experience.
-        </p>
-      </div>
+          <button
+            type="submit"
+            className="bg-black text-white px-4 py-2 w-full disabled:opacity-50 disabled:cursor-not-allowed rounded-md hover:bg-gray-800 transition-colors"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Saving..." : "Complete Profile"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
