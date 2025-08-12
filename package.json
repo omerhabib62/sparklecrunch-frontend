@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "dotenv -e .env.development -- next dev --turbopack",
-    "build": "dotenv -e .env.staging -- next dev --turbopack",
+    "dev": "dotenv -e .env.development -- next dev",
+    "build": "dotenv -e .env.staging -- next dev",
     "start": "dotenv -e .env.production -- next start",
     "staging": "next dev",
     "lint": "next lint"

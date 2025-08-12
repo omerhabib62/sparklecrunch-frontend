@@ -40,7 +40,11 @@ export default function LoginPage() {
 
       setAuth(user, accessToken);
 
-      window.location.href = "/";
+      // Wait for cookie to be set, then force full page navigation
+      setTimeout(() => {
+        console.log("🚀 Forcing navigation to trigger middleware");
+        window.location.replace("/"); // Use replace instead of href
+      }, 200);
     } catch (err) {
       console.error("Login error:", err);
       setError("Login failed! Please check your credentials.");

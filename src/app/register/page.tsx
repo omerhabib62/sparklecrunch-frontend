@@ -99,8 +99,10 @@ export default function RegisterPage() {
       const { user, accessToken } = await register(form);
       setAuth(user, accessToken);
 
-      // Just navigate - let middleware decide where to go
-      window.location.href = "/";
+      // Force full page navigation to trigger middleware
+      setTimeout(() => {
+        window.location.replace("/");
+      }, 200);
     } catch (err) {
       console.error("Registration error:", err);
       setError("Registration failed. Please try again.");
